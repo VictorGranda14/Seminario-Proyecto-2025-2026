@@ -54,8 +54,8 @@ def classify_tx_dimensions(comments: list[str]) -> list[str]:
     con las dimensiones TX encontradas.
     """
     client = _get_authenticated_client()
-    project_name = "ClasificadorDimensionesTX"  # El nombre que le diste a tu proyecto
-    deployment_name = "deployment-name"       # El nombre que le diste al despliegue
+    project_name = "Clasificador-Multietiqueta-Tesis"  # El nombre que le diste a tu proyecto
+    deployment_name = "modelo-v1"       # El nombre que le diste al despliegue
 
     poller = client.begin_multi_label_classify(
         documents=comments,

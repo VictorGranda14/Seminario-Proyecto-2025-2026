@@ -1,18 +1,14 @@
 # scripts/select_random_sample.py
 
 import pandas as pd
-
 # --- Configuración ---
-SOURCE_FILE = "data/Chile_en_limpio.xlsx"
-OUTPUT_FILE = "data/comentarios_para_doccano.txt"
+SOURCE_FILE = "data/processed/Comentarios_en_Final.xlsx"
+OUTPUT_FILE = "data/comentarios_doccano.txt"
 COMMENT_COLUMN = "review_text"
-SAMPLE_SIZE = 2000 
+SAMPLE_SIZE = 2000
 
 def select_and_save_random_sample():
-    """
-    Lee un archivo Excel, selecciona una muestra aleatoria de comentarios
-    y los guarda en un archivo de texto plano para Doccano.
-    """
+    
     print(f"Cargando datos desde {SOURCE_FILE}...")
     try:
         df = pd.read_excel(SOURCE_FILE)

@@ -1,69 +1,79 @@
-# main.py
-
 import pandas as pd
 from src.azure_client import analyze_sentiments_and_opinions, classify_tx_dimensions
-import time
+from src.data_processing import load_data, filter_by_attraction
 
-# --- Configuración ---
-SOURCE_FILE = "data/raw/comentarios_tripadvisor.xlsx"
-OUTPUT_FILE = "data/processed/resultados_completos.csv"
+# --- CONFIGURACIÓN DEL ANÁLISIS ---
+SOURCE_FILE = "data/processed/Comentarios_en_Final.xlsx"
+OUTPUT_FILE = "data/processed/Analisis_Atraccion_Especifica.xlsx"
+ATTRACTION_TO_ANALYZE = "Sousas Tour"  
 COMMENT_COLUMN = "review_text"
-BATCH_SIZE = 5  # Tamaño del lote para enviar a la API (máximo 5 para clasificación)
+ID_COLUMN = "Comment_ID"
+BATCH_SIZE = 5 
 
 def main():
     """
-    Función principal que lee los comentarios, llama a las APIs de Azure en lotes,
-    y guarda los resultados en un nuevo archivo.
+    Orquesta el análisis completo para una única atracción turística.
     """
-    # 1. Cargar los datos
+    # 1. Cargar los datos limpios
     print(f"Cargando datos desde {SOURCE_FILE}...")
-    df = pd.read_excel(SOURCE_FILE)
-    print(f"Se cargaron {len(df)} comentarios.")
+    df_full = load_data(SOURCE_FILE)
+    if df_full is None:
+        return
+    
+    # 2. Filtrar para la atracción específica
+    df_attraction = filter_by_attraction(df_full, ATTRACTION_TO_ANALYZE)
 
-    # Listas para guardar todos los resultados
-    all_sentiments = []
-    all_opinions = []
-    all_dimensions = []
+    if df_attraction.empty:
+        print(f"No se encontraron comentarios para la atracción '{ATTRACTION_TO_ANALYZE}'.")
+        return
+    
+    print(f"Se encontraron {len(df_attraction)} comentarios para analizar.")
 
-    # 2. Procesar el DataFrame en lotes
-    for i in range(0, len(df), BATCH_SIZE):
-        batch_df = df.iloc[i:i+BATCH_SIZE]
-        comments_batch = batch_df[COMMENT_COLUMN].tolist()
+    # 3. Preparar los datos para las APIs
+    comments_list = df_attraction[COMMENT_COLUMN].tolist()
+    ids_list = df_attraction[ID_COLUMN].tolist()
+    
+    # Listas para guardar los resultados
+    sentiment_results = []
+    dimension_results = []
+
+    # 4. Procesar en lotes y llamar a las APIs
+    print("Iniciando procesamiento en lotes con las APIs de Azure...")
+    for i in range(0, len(comments_list), BATCH_SIZE):
+        batch = comments_list[i:i+BATCH_SIZE]
         
-        print(f"Procesando lote {i//BATCH_SIZE + 1} de {len(df)//BATCH_SIZE + 1}...")
-
-        try:
-            # 3. Llamar a las APIs de Azure
-            sentiment_results = analyze_sentiments_and_opinions(comments_batch)
-            dimension_results = classify_tx_dimensions(comments_batch)
-
-            # 4. Añadir resultados a las listas
-            for sentiment, opinion in sentiment_results:
-                all_sentiments.append(sentiment)
-                all_opinions.append(opinion)
-            
-            all_dimensions.extend(dimension_results)
-
-        except Exception as e:
-            print(f"  -> Ocurrió un error en este lote: {e}")
-            # Añadir valores de error para mantener la consistencia de las filas
-            all_sentiments.extend(["ERROR"] * len(comments_batch))
-            all_opinions.extend(["ERROR"] * len(comments_batch))
-            all_dimensions.extend(["ERROR"] * len(comments_batch))
+        print(f"  Procesando lote {i//BATCH_SIZE + 1}...")
         
-        # Pausa para no exceder los límites de la API (20 llamadas por minuto para F0)
-        time.sleep(3) 
+        # Llamada a la API de Sentimiento
+        sentiments = analyze_sentiments_and_opinions(batch)
+        sentiment_results.extend(sentiments)
+        
+        # Llamada a la API de Clasificación de Dimensiones
+        dimensions = classify_tx_dimensions(batch)
+        dimension_results.extend(dimensions)
 
-    # 5. Añadir las nuevas columnas al DataFrame
-    print("Añadiendo resultados al DataFrame...")
-    df['Sentimiento'] = all_sentiments
-    df['Aspectos'] = all_opinions
-    df['Dimensiones_TX'] = all_dimensions
+    # 5. Combinar todo en un nuevo DataFrame
+    print("Combinando los resultados del análisis...")
+    
+    final_data = []
+    for i in range(len(comments_list)):
+        final_data.append({
+            'Comment_ID': ids_list[i],
+            'review_text': comments_list[i],
+            'Sentimiento': sentiment_results[i][0], # El primer elemento de la tupla es el sentimiento
+            'Aspectos_Minados': sentiment_results[i][1], # El segundo son los aspectos
+            'Dimensiones_TX': dimension_results[i]
+        })
+        
+    results_df = pd.DataFrame(final_data)
 
-    # 6. Guardar el resultado final
-    print(f"Guardando resultados en {OUTPUT_FILE}...")
-    df.to_csv(OUTPUT_FILE, index=False, encoding='utf-8-sig')
-    print("¡Proceso completado exitosamente!")
+    # 6. Guardar el archivo de resultados
+    print(f"Guardando el análisis para '{ATTRACTION_TO_ANALYZE}' en {OUTPUT_FILE}...")
+    results_df.to_excel(OUTPUT_FILE, index=False)
+    
+    print("\nAnálisis para la atracción completado")
+    print("\nPrimeras 5 filas del resultado:")
+    print(results_df.head())
 
 
 if __name__ == "__main__":
