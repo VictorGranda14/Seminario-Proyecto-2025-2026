@@ -21,7 +21,8 @@ def _get_authenticated_client():
 def analyze_sentiments_and_opinions(comments: list[str]) -> list[tuple[str, str]]:
     """
     Analiza una lista de comentarios y devuelve una lista de tuplas 
-    con (sentimiento_general, aspectos_minados).
+    con (sentimiento_general, aspectos_minados_con_sentimiento).
+    Formato de salida: "aspecto(opinion|sentimiento), aspecto2(opinion2|sentimiento2)"
     """
     client = _get_authenticated_client()
     response = client.analyze_sentiment(
@@ -36,13 +37,23 @@ def analyze_sentiments_and_opinions(comments: list[str]) -> list[tuple[str, str]
             parsed_results.append(("ERROR", "ERROR"))
             continue
             
-        # Parsear los aspectos y sus opiniones en un solo string
+        # Parsear los aspectos, sus opiniones Y SU SENTIMIENTO
         mined_opinions = []
         for sentence in doc.sentences:
-            for opinion in sentence.mined_opinions:
-                aspect = opinion.aspect.text
-                opinion_texts = " ".join([o.text for o in opinion.opinions])
-                mined_opinions.append(f"{aspect}({opinion_texts})")
+            if sentence.mined_opinions:
+                for mined_opinion in sentence.mined_opinions:
+                    target = mined_opinion.target
+                    assessments = mined_opinion.assessments
+                    
+                    aspect_text = target.text
+                    
+                    # Unimos opiniones y tomamos el sentimiento de la primera (generalmente coinciden)
+                    opinion_texts = " ".join([a.text for a in assessments])
+                    # Tomamos el sentimiento de la opinión (positive/negative/mixed)
+                    sentiment = assessments[0].sentiment if assessments else "neutral"
+                    
+                    # Guardamos con el separador '|'
+                    mined_opinions.append(f"{aspect_text}({opinion_texts}|{sentiment})")
         
         parsed_results.append((doc.sentiment, ", ".join(mined_opinions)))
         
@@ -54,13 +65,15 @@ def classify_tx_dimensions(comments: list[str]) -> list[str]:
     con las dimensiones TX encontradas.
     """
     client = _get_authenticated_client()
-    project_name = "Clasificador-Multietiqueta-Tesis"  # El nombre que le diste a tu proyecto
-    deployment_name = "modelo-v1"       # El nombre que le diste al despliegue
+    
+    project_name = "Clasificador-Multietiqueta-Tesis" 
+    deployment_name = "model-v1"
 
     poller = client.begin_multi_label_classify(
         documents=comments,
         project_name=project_name,
-        deployment_name=deployment_name
+        deployment_name=deployment_name,
+        language="en"
     )
     
     result = poller.result()
@@ -71,8 +84,11 @@ def classify_tx_dimensions(comments: list[str]) -> list[str]:
             parsed_results.append("ERROR")
             continue
         
-        # Unir todas las etiquetas encontradas en un solo string
+        # Extraemos las categorías (etiquetas) y las unimos con comas
+        # doc_result.classifications es una lista de objetos ClassificationCategory
         labels = [classification.category for classification in doc_result.classifications]
+        
+        # Si no encontró ninguna etiqueta, esto quedará como una cadena vacía "", lo cual es correcto
         parsed_results.append(", ".join(labels))
         
     return parsed_results

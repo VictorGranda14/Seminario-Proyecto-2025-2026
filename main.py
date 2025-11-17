@@ -4,10 +4,10 @@ from src.data_processing import load_data, filter_by_attraction
 
 # --- CONFIGURACIÓN DEL ANÁLISIS ---
 SOURCE_FILE = "data/processed/Comentarios_en_Final.xlsx"
-OUTPUT_FILE = "data/processed/Analisis_Atraccion_Especifica.xlsx"
-ATTRACTION_TO_ANALYZE = "Sousas Tour"  
+OUTPUT_FILE = "data/processed/Analisis_Vina_Santa_Rita.xlsx"
+ATTRACTION_TO_ANALYZE = "Vina Santa Rita"  
 COMMENT_COLUMN = "review_text"
-ID_COLUMN = "Comment_ID"
+ID_COLUMN = "ID"
 BATCH_SIZE = 5 
 
 def main():
