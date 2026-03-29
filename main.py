@@ -1,80 +1,63 @@
 import pandas as pd
-from src.azure_client import analyze_sentiments_and_opinions, classify_tx_dimensions
-from src.data_processing import load_data, filter_by_attraction
+from src.models.aspect_miner import AspectMinerLocal
+from src.utils.database import DBManager
 
-# --- CONFIGURACIÓN DEL ANÁLISIS ---
-SOURCE_FILE = "data/processed/Comentarios_en_Final.xlsx"
-OUTPUT_FILE = "data/processed/Analisis_Vina_Santa_Rita.xlsx"
-ATTRACTION_TO_ANALYZE = "Vina Santa Rita"  
-COMMENT_COLUMN = "review_text"
-ID_COLUMN = "ID"
-BATCH_SIZE = 5 
+# --- CONFIGURACIÓN DE EJECUCIÓN ---
+# Si quieres procesar todo, déjalo como None.
+# Si quieres procesar una atracción específica, pon su nombre exacto, ej: "Viña Santa Rita"
+ATRACCION_OBJETIVO = "Viña Santa Rita" 
 
 def main():
-    """
-    Orquesta el análisis completo para una única atracción turística.
-    """
-    # 1. Cargar los datos limpios
-    print(f"Cargando datos desde {SOURCE_FILE}...")
-    df_full = load_data(SOURCE_FILE)
-    if df_full is None:
+    print("Iniciando Orquestador Principal...")
+    
+    # 1. Cargar datos limpios
+    data_path = "data/processed/Dataset_Limpio_Final.csv"
+    try:
+        df = pd.read_csv(data_path, sep=';') 
+    except FileNotFoundError:
+        print(f"No se encontró el dataset en {data_path}.")
         return
-    
-    # 2. Filtrar para la atracción específica
-    df_attraction = filter_by_attraction(df_full, ATTRACTION_TO_ANALYZE)
 
-    if df_attraction.empty:
-        print(f"No se encontraron comentarios para la atracción '{ATTRACTION_TO_ANALYZE}'.")
+    # 2. Aplicar filtro de atracción (si está configurado)
+    if ATRACCION_OBJETIVO:
+        df = df[df['attraction_name'] == ATRACCION_OBJETIVO].copy()
+        print(f"Modo Filtrado: Procesando solo '{ATRACCION_OBJETIVO}' ({len(df)} comentarios).")
+    else:
+        print(f"Modo Masivo: Procesando TODO el dataset ({len(df)} comentarios).")
+
+    # 3. Inicializar Base de Datos y revisar progreso
+    db = DBManager()
+    procesados = db.get_processed_ids()
+    
+    # Descartar los comentarios que ya están en SQLite
+    df_a_procesar = df[~df['Comment_ID'].isin(procesados)]
+    print(f"Comentarios pendientes en esta ejecución: {len(df_a_procesar)}")
+
+    if len(df_a_procesar) == 0:
+        print("No hay comentarios nuevos por procesar.")
         return
-    
-    print(f"Se encontraron {len(df_attraction)} comentarios para analizar.")
 
-    # 3. Preparar los datos para las APIs
-    comments_list = df_attraction[COMMENT_COLUMN].tolist()
-    ids_list = df_attraction[ID_COLUMN].tolist()
-    
-    # Listas para guardar los resultados
-    sentiment_results = []
-    dimension_results = []
+    # 4. Inicializar el Minero de Aspectos (PyABSA)
+    miner = AspectMinerLocal()
 
-    # 4. Procesar en lotes y llamar a las APIs
-    print("Iniciando procesamiento en lotes con las APIs de Azure...")
-    for i in range(0, len(comments_list), BATCH_SIZE):
-        batch = comments_list[i:i+BATCH_SIZE]
-        
-        print(f"  Procesando lote {i//BATCH_SIZE + 1}...")
-        
-        # Llamada a la API de Sentimiento
-        sentiments = analyze_sentiments_and_opinions(batch)
-        sentiment_results.extend(sentiments)
-        
-        # Llamada a la API de Clasificación de Dimensiones
-        dimensions = classify_tx_dimensions(batch)
-        dimension_results.extend(dimensions)
+    # 5. Bucle de procesamiento
+    print("Extrayendo aspectos y opiniones...")
+    for index, row in df_a_procesar.iterrows():
+        c_id = row['Comment_ID']
+        attraction = row['attraction_name']
+        text = str(row['review_text'])
 
-    # 5. Combinar todo en un nuevo DataFrame
-    print("Combinando los resultados del análisis...")
-    
-    final_data = []
-    for i in range(len(comments_list)):
-        final_data.append({
-            'Comment_ID': ids_list[i],
-            'review_text': comments_list[i],
-            'Sentimiento': sentiment_results[i][0], # El primer elemento de la tupla es el sentimiento
-            'Aspectos_Minados': sentiment_results[i][1], # El segundo son los aspectos
-            'Dimensiones_TX': dimension_results[i]
-        })
-        
-    results_df = pd.DataFrame(final_data)
+        if text.strip() == "" or text.lower() == "nan":
+            continue
 
-    # 6. Guardar el archivo de resultados
-    print(f"Guardando el análisis para '{ATTRACTION_TO_ANALYZE}' en {OUTPUT_FILE}...")
-    results_df.to_excel(OUTPUT_FILE, index=False)
-    
-    print("\nAnálisis para la atracción completado")
-    print("\nPrimeras 5 filas del resultado:")
-    print(results_df.head())
+        aspectos = miner.extract_aspects(text)
+        db.save_aspects(c_id, attraction, aspectos)
 
+        # Contador cada 50 comentarios
+        if (index + 1) % 50 == 0:
+            print(f"Procesados {index + 1} comentarios...")
+
+    print("Procesamiento finalizado.")
 
 if __name__ == "__main__":
     main()

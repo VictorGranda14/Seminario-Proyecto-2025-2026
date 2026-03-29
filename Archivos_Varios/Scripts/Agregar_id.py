@@ -39,4 +39,4 @@ if __name__ == "__main__":
     print("\n--- RESUMEN ---")
     print(f"Se procesaron {len(df)} comentarios.")
     print(f"Se añadió una nueva columna de ID llamada '{ID_COLUMN_NAME}'.")
-    print("¡Proceso completado! ✅")
+    print("¡Proceso completado!")

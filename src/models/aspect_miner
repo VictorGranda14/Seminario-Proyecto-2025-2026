@@ -1,0 +1,71 @@
+import warnings
+from pyabsa import AspectTermExtraction as ATEPC
+import logging
+
+# Silenciamos advertencias de librerías subyacentes para no ensuciar la consola
+warnings.filterwarnings("ignore")
+logging.getLogger("transformers").setLevel(logging.ERROR)
+
+class AspectMinerLocal:
+    def __init__(self):
+        print("Inicializando modelo local de Minería de Opiniones (PyABSA)...")
+        print("Esto puede tomar unos segundos la primera vez (carga de pesos en memoria).")
+        # 'english' descarga automáticamente el checkpoint preentrenado optimizado para ABSA
+        self.extractor = ATEPC.AspectExtractor('english')
+        
+    def extract_aspects(self, text: str):
+            """
+            Recibe un texto y devuelve una lista de diccionarios con aspectos, opiniones y sentimiento.
+            """
+            if not isinstance(text, str) or len(text.strip()) == 0:
+                return []
+
+            # Realizamos la inferencia
+            result = self.extractor.predict(text, save_result=False, print_result=False, ignore_error=True)
+            
+            extracted_data = []
+            
+            # PyABSA devuelve dict (si es 1 texto) o list (si es batch). Lo estandarizamos.
+            if isinstance(result, list) and len(result) > 0:
+                res_dict = result[0]
+            elif isinstance(result, dict):
+                res_dict = result
+            else:
+                return [] # Si viene vacío o falla
+                
+            # Si encontró aspectos en la oración
+            if 'aspect' in res_dict and res_dict['aspect']:
+                for i in range(len(res_dict['aspect'])):
+                    aspecto = res_dict['aspect'][i]
+                    polaridad = res_dict['sentiment'][i]
+                    
+                    # Extraer contexto
+                    posicion = res_dict['position'][i][0]
+                    tokens = res_dict['tokens']
+                    
+                    inicio = max(0, posicion - 3)
+                    fin = min(len(tokens), posicion + 4)
+                    opinion_contexto = " ".join(tokens[inicio:posicion] + tokens[posicion+1:fin])
+                    
+                    extracted_data.append({
+                        'aspect': aspecto.lower(),
+                        'opinion': opinion_contexto.lower(),
+                        'sentiment': polaridad.lower()
+                    })
+                        
+            return extracted_data
+
+# Bloque de prueba local
+if __name__ == "__main__":
+    miner = AspectMinerLocal()
+    
+    comentario_dificil = "Wine was definitely not good, but they tried to hide it with fancy wine pourers."
+    
+    print(f"\nAnalizando: '{comentario_dificil}'")
+    resultados = miner.extract_aspects(comentario_dificil)
+    
+    print("\n🔍 Resultados extraídos:")
+    for r in resultados:
+        print(f" - Aspecto: {r['aspect']}")
+        print(f"   Contexto/Opinión: {r['opinion']}")
+        print(f"   Sentimiento: {r['sentiment']}\n")
