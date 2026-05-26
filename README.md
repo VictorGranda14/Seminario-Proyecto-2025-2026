@@ -1,38 +1,80 @@
-# Seminario-Proyecto-2025-2026
+## Estructura del Proyecto
 
-Seminario_Proyecto/
+```text
+Seminario-Proyecto-2025-2026/
 │
-├── data/                   # ALMACENAMIENTO DE DATOS (No se sube a GitHub)
-│   ├── raw/                # El Excel original con los 560.000 comentarios crudos.
-│   ├── processed/          # El dataset limpio de 153.446 filas (ej. parquet o sqlite).
-│   └── outputs/            # Resultados finales: resúmenes, extracciones ABSA y dimensiones.
+├── data/                   # NO subir a GitHub (añadir al .gitignore)
+│   ├── raw/                # CSV original de TripAdvisor
+│   ├── processed/          # Datos limpios listos para inferencia
+│   └── outputs/            # JSONs exportados para el dashboard interactivo
 │
-├── notebooks/              # ENTORNOS DE PRUEBA
-│   ├── 01_exploracion.ipynb# Análisis exploratorio inicial (EDA).
-│   └── 02_pruebas_absa.ipynb# Pruebas aisladas para PyABSA antes de pasarlo a producción.
+├── notebooks/              # Jupyter notebooks para pruebas rápidas o EDA
 │
-├── src/                    # CÓDIGO FUENTE (Módulos del pipeline)
-│   ├── __init__.py
-│   ├── data_prep/          # Fase 1
-│   │   ├── cleaning.py     # Lógica de eliminación de nulos, dueños y duplicados.
-│   │   └── lang_filter.py  # Script que usa xlm-roberta-base para filtrar inglés.
-│   ├── models/             # Fase 2 y 3
-│   │   ├── aspect_miner.py # Implementación de PyABSA.
-│   │   └── tx_classifier.py# Tu modelo multietiqueta (Dimensiones TX).
-│   ├── summarization/      # Fase 4
-│   │   └── generator.py    # Generación de resúmenes (Data-to-Text).
-│   └── utils/              # Utilidades compartidas
-│       ├── database.py     # Conexiones a SQLite/Parquet para guardado incremental.
-│       └── logger.py       # Configuración para registrar errores y progreso del bucle.
+├── src/
+│   ├── config/             # Variables de entorno y mapeos
+│   │   └── settings.py     # Rutas de carpetas, credenciales de Azure, etc.
+│   │
+│   ├── data_prep/          # Pipeline ETL y limpieza estandarizada
+│   │   └── cleaner.py      # Separación de respuestas, detección de idioma
+│   │
+│   ├── models/             # Patrón Strategy para la inferencia
+│   │   ├── base_model.py   # Interfaz/Clase padre (AnalizadorBase)
+│   │   ├── azure_model.py  # Conexión a la API de Microsoft Azure
+│   │   ├── local_model.py  # Arquitectura Híbrida (PyABSA + SpaCy)
+│   │   └── slm_model.py    # Futura implementación SLM
+│   │
+│   ├── summarization/      # Generación de resúmenes ejecutivos
+│   │   └── generator.py
+│   │
+│   └── utils/
+│       └── exporter.py     # Conversión de DataFrames a JSON
 │
-├── main.py                 # ORQUESTADOR: Une todas las fases de 'src' y ejecuta el bucle.
-├── requirements.txt        # Dependencias (pandas, pyabsa, transformers, openpyxl, etc.).
-├── .env                    # Variables de entorno (paths, configuraciones de ejecución).
-└── .gitignore              # Archivos a ignorar (.env, carpeta data/, __pycache__).
+├── .env.example            # Plantilla de variables de entorno (claves API)
+├── .gitignore              # Archivos a ignorar (data/, .env, venv/, etc.)
+├── requirements.txt        # Dependencias del proyecto
+└── main.py                 # Orquestador principal (CLI)
+```
+## Instalación y dependencias
 
+1. Clonar el repositorio e ingresar a la carpeta.
+2. Crear y activar un entorno virtual aislando las dependencias: 
+```text
+# En Windows
+   python -m venv venv
+   venv\Scripts\activate
+# En macOS/Linux
+   python3 -m venv venv
+   source venv/bin/activate
+```
+3. Instalar las dependencias del proyecto:
+```text
+pip install -r requirements.txt
+```
+4. Descargar los modelos lingüísticos base para SpaCy:
+```text
+# Modelo para análisis en inglés (Requerido para NLP general)
+   python -m spacy download en_core_web_sm
+   
+# Modelo para análisis en español (Opcional, según requerimientos de idioma)
+   python -m spacy download es_core_news_sm
+```
 
+## Ejecución
 
-PyABSA (ATEPC) no escupe la palabra "good" aislada, utilizamos las posiciones de los tokens para capturar el texto que rodea al aspecto (3 palabras antes y 3 después). Esto captura perfectamente modificadores como "definitely not good".
+El pipeline de análisis se orquesta a través del archivo "main.py" utilizando argumentos por consola para seleccionar el comportamiento sin modificar el código fuente.
 
-pip install pyabsa
-pip install protobuf tiktoken sentencepiece
+Opciones disponibles:
+
+- model: Define la arquitectura a utilizar (azure, local, slm).
+
+- limit: (Opcional) Limita la cantidad de filas a procesar para realizar pruebas rápidas y evitar consumos innecesarios de API.
+
+### Ejemplos 
+- Ejecutar el modelo local con todo el dataset:
+```text
+python main.py --model local
+```
+- Ejecutar el modelo de Azure con un límite de prueba (ej. 500 comentarios):
+```text
+python main.py --model azure --limit 500
+```
