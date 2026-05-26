@@ -5,7 +5,7 @@ pandas
 openpyxl
 
 # Para llamar a la API de Azure
-#azure-ai-textanalytics
+azure-ai-textanalytics
 
 # Para cargar variables de entorno (claves secretas)
 python-dotenv

@@ -1,84 +1,80 @@
 import pandas as pd
-from src.models.aspect_miner import AspectMinerLocal
-import sqlite3
-import os
+from src.azure_client import analyze_sentiments_and_opinions, classify_tx_dimensions
+from src.data_processing import load_data, filter_by_attraction
 
-# Lista Atracciones
-ATRACCIONES = ["Vina Santa Rita"]
+# --- CONFIGURACIÓN DEL ANÁLISIS ---
+SOURCE_FILE = "data/processed/Comentarios_en_Final.xlsx"
+OUTPUT_FILE = "data/processed/Analisis_Vina_Santa_Rita.xlsx"
+ATTRACTION_TO_ANALYZE = "Vina Santa Rita"  
+COMMENT_COLUMN = "review_text"
+ID_COLUMN = "ID"
+BATCH_SIZE = 5 
 
 def main():
-    print("Iniciando Orquestador Principal...")
-    
-    # 1. Cargar datos limpios
-    data_path = "data/processed/Comentarios_en_Final.csv"
-    try:
-        df = pd.read_csv(data_path, sep=';') 
-    except FileNotFoundError:
-        print(f"No se encontró el dataset en {data_path}.")
+    """
+    Orquesta el análisis completo para una única atracción turística.
+    """
+    # 1. Cargar los datos limpios
+    print(f"Cargando datos desde {SOURCE_FILE}...")
+    df_full = load_data(SOURCE_FILE)
+    if df_full is None:
         return
-
-    # Bloque de compatibilidad de ID
-    if 'Comment_ID' not in df.columns:
-        if 'ID' in df.columns:
-            df.rename(columns={'ID': 'Comment_ID'}, inplace=True)
-        else:
-            df.insert(0, 'Comment_ID', [f"REV-{i+1}" for i in range(len(df))])
-
-    miner = AspectMinerLocal()
-    os.makedirs("data/outputs", exist_ok=True)
-    conn = sqlite3.connect("data/outputs/resultados_nlp.db")
-    cursor = conn.cursor()
     
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS aspect_results (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            c_id TEXT,
-            attraction TEXT,
-            aspect TEXT,
-            opinion TEXT,
-            sentiment TEXT
-        )
-    ''')
-    conn.commit()
+    # 2. Filtrar para la atracción específica
+    df_attraction = filter_by_attraction(df_full, ATTRACTION_TO_ANALYZE)
 
-    # Leemos lo que ya está en la base de datos para no repetir
-    procesados = pd.read_sql_query("SELECT DISTINCT c_id FROM aspect_results", conn)['c_id'].tolist()
+    if df_attraction.empty:
+        print(f"No se encontraron comentarios para la atracción '{ATTRACTION_TO_ANALYZE}'.")
+        return
+    
+    print(f"Se encontraron {len(df_attraction)} comentarios para analizar.")
 
-    # 2. Iterar sobre las atracciones seleccionadas
-    for atraccion in ATRACCIONES:
-        df_atraccion = df[df['attraction_name'] == atraccion].copy()
-        
-        if df_atraccion.empty:
-            print(f"No se encontraron comentarios para '{atraccion}'. Revisa el nombre exacto.")
-            continue
-            
-        df_a_procesar = df_atraccion[~df_atraccion['Comment_ID'].isin(procesados)]
-        total = len(df_a_procesar)
-        
-        print(f"\nProcesando '{atraccion}': {total} comentarios nuevos (saltando {len(df_atraccion) - total} ya procesados).")
-        
-        contador = 0
-        for index, row in df_a_procesar.iterrows():
-            comentario_id = row['Comment_ID']
-            texto = str(row['review_text'])
-            
-            resultados = miner.extract_aspects(texto)
-            
-            for res in resultados:
-                cursor.execute('''
-                    INSERT INTO aspect_results (c_id, attraction, aspect, opinion, sentiment)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (comentario_id, atraccion, res['aspect'], res['opinion'], res['sentiment']))
-            
-            conn.commit()
-            contador += 1
-            
-            # Imprimir progreso cada 50 comentarios para saber que no está congelado
-            if contador % 50 == 0 or contador == total:
-                print(f"Progreso {atraccion}: {contador}/{total} comentarios procesados...")
+    # 3. Preparar los datos para las APIs
+    comments_list = df_attraction[COMMENT_COLUMN].tolist()
+    ids_list = df_attraction[ID_COLUMN].tolist()
+    
+    # Listas para guardar los resultados
+    sentiment_results = []
+    dimension_results = []
 
-    conn.close()
-    print("\nProceso Masivo Finalizado.")
+    # 4. Procesar en lotes y llamar a las APIs
+    print("Iniciando procesamiento en lotes con las APIs de Azure...")
+    for i in range(0, len(comments_list), BATCH_SIZE):
+        batch = comments_list[i:i+BATCH_SIZE]
+        
+        print(f"  Procesando lote {i//BATCH_SIZE + 1}...")
+        
+        # Llamada a la API de Sentimiento
+        sentiments = analyze_sentiments_and_opinions(batch)
+        sentiment_results.extend(sentiments)
+        
+        # Llamada a la API de Clasificación de Dimensiones
+        dimensions = classify_tx_dimensions(batch)
+        dimension_results.extend(dimensions)
+
+    # 5. Combinar todo en un nuevo DataFrame
+    print("Combinando los resultados del análisis...")
+    
+    final_data = []
+    for i in range(len(comments_list)):
+        final_data.append({
+            'Comment_ID': ids_list[i],
+            'review_text': comments_list[i],
+            'Sentimiento': sentiment_results[i][0], # El primer elemento de la tupla es el sentimiento
+            'Aspectos_Minados': sentiment_results[i][1], # El segundo son los aspectos
+            'Dimensiones_TX': dimension_results[i]
+        })
+        
+    results_df = pd.DataFrame(final_data)
+
+    # 6. Guardar el archivo de resultados
+    print(f"Guardando el análisis para '{ATTRACTION_TO_ANALYZE}' en {OUTPUT_FILE}...")
+    results_df.to_excel(OUTPUT_FILE, index=False)
+    
+    print("\nAnálisis para la atracción completado")
+    print("\nPrimeras 5 filas del resultado:")
+    print(results_df.head())
+
 
 if __name__ == "__main__":
     main()
