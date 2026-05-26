@@ -17,7 +17,6 @@ def _get_authenticated_client():
     return client
 
 # --- Funciones para llamar a las APIs y PARSEAR los resultados ---
-
 def analyze_sentiments_and_opinions(comments: list[str]) -> list[tuple[str, str]]:
     """
     Analiza una lista de comentarios y devuelve una lista de tuplas 
