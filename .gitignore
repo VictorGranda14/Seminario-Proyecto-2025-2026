@@ -136,6 +136,10 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Chekpoint files
+checkpoints.json
+/checkpoints
+
 # Environments
 .env
 .envrc
