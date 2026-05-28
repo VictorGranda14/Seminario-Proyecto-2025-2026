@@ -1,0 +1,15 @@
+# Archivo de requerimientos de Python
+
+# Para manipulación de datos
+pandas
+openpyxl
+
+# API REST
+fastapi
+uvicorn
+
+# Para llamar a la API de Azure
+azure-ai-textanalytics
+
+# Para cargar variables de entorno (claves secretas)
+python-dotenv

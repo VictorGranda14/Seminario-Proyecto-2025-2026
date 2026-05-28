@@ -139,6 +139,7 @@ celerybeat.pid
 # Chekpoint files
 checkpoints.json
 /checkpoints
+/backend/checkpoints/
 
 # Environments
 .env
