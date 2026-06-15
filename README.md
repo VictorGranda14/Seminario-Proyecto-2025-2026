@@ -78,3 +78,6 @@ python main.py --model local
 ```text
 python main.py --model azure --limit 500
 ```
+
+
+py -m src.data_prep.csv_a_sqlite

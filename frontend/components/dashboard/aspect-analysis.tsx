@@ -3,12 +3,15 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { TrendingUp, AlertTriangle } from "lucide-react"
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Cell, Tooltip } from "recharts"
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
 
+// 1. Actualizamos la interfaz para soportar la data de Python (array) 
+// y la variable totalFreq que agregamos al backend
 interface AspectItem {
   aspect: string
   freq: number
-  keywords: string
+  totalFreq?: number 
+  keywords: string | string[]
 }
 
 interface AspectAnalysisProps {
@@ -30,14 +33,17 @@ function AspectCard({
   icon: typeof TrendingUp
 }) {
   const isStrength = type === "strength"
-  const barColor = isStrength ? "hsl(var(--success))" : "hsl(var(--destructive))"
+  const barColor = isStrength ? "#2eab79" : "#d9534f" 
   const bgColor = isStrength ? "bg-success/10" : "bg-destructive/10"
   const iconColor = isStrength ? "text-success" : "text-destructive"
   
+  // 2. Normalizamos la data para que el gráfico y las keywords no crasheen
   const chartData = items.map(item => ({
     aspect: item.aspect.charAt(0).toUpperCase() + item.aspect.slice(1),
     freq: item.freq,
-    keywords: item.keywords
+    totalFreq: item.totalFreq,
+    // Soporta tanto el fallback (string) como el script Python (array)
+    keywords: Array.isArray(item.keywords) ? item.keywords : item.keywords.split(", ")
   }))
 
   return (
@@ -76,14 +82,20 @@ function AspectCard({
                 width={80}
               />
               <Tooltip
+                cursor={{ fill: "transparent" }}
                 content={({ active, payload }) => {
                   if (active && payload && payload.length) {
                     const data = payload[0].payload
                     return (
                       <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
                         <p className="font-medium text-foreground">{data.aspect}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Frecuencia: <span className="font-semibold text-foreground">{data.freq}</span>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {isStrength ? "Positivos" : "Quejas directas"}: <span className="font-semibold text-foreground">{data.freq}</span>
+                          {data.totalFreq && (
+                            <span className="text-xs text-muted-foreground ml-1 block">
+                              (de {data.totalFreq} menciones totales)
+                            </span>
+                          )}
                         </p>
                       </div>
                     )
@@ -91,15 +103,14 @@ function AspectCard({
                   return null
                 }}
               />
+              {/* 3. ¡AQUÍ ESTABA EL ERROR VISUAL! Faltaba inyectar el color al Bar */}
               <Bar 
                 dataKey="freq" 
+                fill={barColor}
                 radius={[0, 4, 4, 0]}
                 barSize={24}
-              >
-                {chartData.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={barColor} fillOpacity={0.85} />
-                ))}
-              </Bar>
+                isAnimationActive={false} 
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -108,11 +119,11 @@ function AspectCard({
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Opiniones Clave por Aspecto
           </p>
-          {items.map((item) => (
+          {chartData.map((item) => (
             <div key={item.aspect} className="space-y-2">
               <p className="text-sm font-medium text-foreground capitalize">{item.aspect}</p>
               <div className="flex flex-wrap gap-1.5">
-                {item.keywords.split(", ").map((keyword) => (
+                {item.keywords.map((keyword: string) => (
                   <Badge 
                     key={keyword} 
                     variant="secondary" 
