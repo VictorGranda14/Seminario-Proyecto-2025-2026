@@ -27,7 +27,7 @@ app.add_middleware(
 
 
 def get_default_db_path() -> str:
-	return os.getenv("BACKEND_DB_PATH", DEFAULT_DB)
+	return os.getenv("DATABASE_URL", DEFAULT_DB)
 
 
 def resolve_database_path(database: str | None) -> str:
