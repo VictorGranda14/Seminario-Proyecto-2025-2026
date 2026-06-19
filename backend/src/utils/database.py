@@ -5,11 +5,14 @@ from datetime import datetime, timezone
 
 from src.config.database_init import initialize_database
 
+DB_PATH = os.getenv("DATABASE_URL", "data/turismo.sqlite")
+
 class DBManager:
-    def __init__(self, db_path="data/turismo.sqlite"):
+    def __init__(self, db_path=DB_PATH):
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
+        self.conn.execute("PRAGMA journal_mode=WAL;") 
         initialize_database(self.conn)
 
     def save_raw_rows(self, rows):
