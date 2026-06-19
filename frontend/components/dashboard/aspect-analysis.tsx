@@ -103,7 +103,6 @@ function AspectCard({
                   return null
                 }}
               />
-              {/* 3. ¡AQUÍ ESTABA EL ERROR VISUAL! Faltaba inyectar el color al Bar */}
               <Bar 
                 dataKey="freq" 
                 fill={barColor}

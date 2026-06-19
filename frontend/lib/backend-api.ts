@@ -27,6 +27,8 @@ interface BackendMetricasPayload {
       dimension?: string
       count?: number
       percentage?: number
+      positive?: number
+      negative?: number
     }>
     topAttractions?: Array<{
       attraction?: string
@@ -40,13 +42,14 @@ interface BackendMetricasPayload {
   executiveSummary?: string
   txDimensions?: Array<{
     dimension?: string
-    score?: number
+    total?: number
+    positive?: number
+    negative?: number
   }>
   aspectAnalysis?: {
     strengths?: Array<{ aspect?: string; freq?: number; keywords?: string[] | string }>
     alerts?: Array<{ aspect?: string; freq?: number; keywords?: string[] | string }>
   }
-  // Añadimos la interfaz de macroCategories a la respuesta cruda de la API
   macroCategories?: Array<{
     category?: string
     freq?: number
@@ -112,16 +115,18 @@ function toDashboardData(payload: BackendMetricasPayload): DashboardData {
 
   const rawDimensions = payload.txDimensions || []
 
-  // 3. Forzamos a que el arreglo final siempre tenga las 7, con 0 si no existen
   const txDimensions = STANDARD_DIMENSIONS.map((stdDim) => {
     const found = rawDimensions.find(
       (item) => item.dimension && normalizeString(item.dimension) === normalizeString(stdDim)
     )
     return {
       dimension: stdDim,
-      score: found ? Number(found.score || 0) : 0,
+      total: found ? Number(found.total || 0) : 0,
+      positive: found ? Number(found.positive || 0) : 0,
+      negative: found ? Number(found.negative || 0) : 0,
     }
   })
+  
 
   const strengths = (payload.aspectAnalysis?.strengths || []).map((item) => ({
     aspect: item.aspect || "general",
@@ -135,7 +140,6 @@ function toDashboardData(payload: BackendMetricasPayload): DashboardData {
     keywords: normalizeKeywords(item.keywords),
   }))
 
-  // Interceptamos y formateamos las macro categorias
   const macroCategories = (payload.macroCategories || []).map((item) => ({
     category: item.category || "Sin clasificar",
     freq: Number(item.freq || 0),
@@ -151,6 +155,8 @@ function toDashboardData(payload: BackendMetricasPayload): DashboardData {
       dimension: item.dimension || "Sin clasificar",
       count: Number(item.count || 0),
       percentage: Number(item.percentage || 0),
+      positive: Number(item.positive || 0),
+      negative: Number(item.negative || 0),
     })),
     topAttractions: (payload.summaryOverview?.topAttractions || []).map((item) => ({
       attraction: item.attraction || "Sin nombre",
@@ -172,6 +178,7 @@ function toDashboardData(payload: BackendMetricasPayload): DashboardData {
         negative,
       },
     },
+    dimensionTotals: summaryOverview.dimensionTotals,
     summaryOverview,
     executiveSummary:
       payload.executiveSummary || "Aun no hay resumen generado para esta vista.",

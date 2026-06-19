@@ -1,14 +1,15 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { AlertCircle, BarChart3, Database, Globe2, Layers3 } from "lucide-react"
+import { AlertCircle, BarChart3, Database, Globe2, Layers3, MapPin, Building2 } from "lucide-react"
 
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
+import { TopAttractionsList } from "@/components/dashboard/top-attractions-list"
 import { ExecutiveSummary } from "@/components/dashboard/executive-summary"
 import { SentimentKPIs } from "@/components/dashboard/sentiment-kpis"
 import { TXDimensionsChart } from "@/components/dashboard/tx-dimensions-chart"
 import { AspectAnalysis } from "@/components/dashboard/aspect-analysis"
-import MacroCategoriesChart from "@/components/dashboard/macro-categorias-chart"
+import { MacroCategoriesChart} from "@/components/dashboard/macro-categorias-chart"
 import { SummaryOverviewPanel } from "@/components/dashboard/summary-overview-panel"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Check, ChevronsUpDown } from "lucide-react"
@@ -215,30 +216,56 @@ export function DashboardClient() {
     [selectedAttractionId, vistas],
   )
 
-  function renderNeutralHero(title: string, subtitle: string, totalReviews: number) {
+function renderNeutralHero(
+    title: string,
+    subtitle: string,
+    totalReviews: number,
+    totalAttractions?: number,
+    totalRubros?: number
+  ) {
     return (
-      <Card className="border-muted/70 bg-gradient-to-r from-primary/5 via-background to-background">
-        <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-              <Globe2 className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Vista inicial</p>
-              <h3 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h3>
-              <p className="text-sm text-muted-foreground">{subtitle}</p>
-            </div>
+      <div className="rounded-xl border border-border bg-muted/30 p-6 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary">
+            <Globe2 className="h-6 w-6 text-primary" />
           </div>
+          <div>
+            <p className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase mb-1">Vista Inicial</p>
+            <h3 className="text-2xl font-bold tracking-tight text-foreground">{title}</h3>
+            <p className="text-sm text-muted-foreground">{subtitle}</p>
+          </div>
+        </div>
 
-          <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
-            <BarChart3 className="h-4 w-4 text-primary" />
-            <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Comentarios analizados</p>
-              <p className="text-lg font-semibold text-foreground">{totalReviews.toLocaleString("es-CL")}</p>
-            </div>
+        <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col rounded-lg border border-border bg-background px-4 py-2 shadow-sm">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Comentarios Analizados</span>
+            <span className="text-lg font-bold flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              {totalReviews.toLocaleString("es-CL")}
+            </span>
           </div>
-        </CardContent>
-      </Card>
+          
+          {totalAttractions !== undefined && totalAttractions > 0 && (
+            <div className="flex flex-col rounded-lg border border-border bg-background px-4 py-2 shadow-sm animate-in fade-in slide-in-from-right-2">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Atracciones</span>
+              <span className="text-lg font-bold flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                {totalAttractions.toLocaleString("es-CL")}
+              </span>
+            </div>
+          )}
+
+          {totalRubros !== undefined && totalRubros > 0 && (
+            <div className="flex flex-col rounded-lg border border-border bg-background px-4 py-2 shadow-sm animate-in fade-in slide-in-from-right-4">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Rubros</span>
+              <span className="text-lg font-bold flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                {totalRubros.toLocaleString("es-CL")}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
     )
   }
 
@@ -275,16 +302,11 @@ function renderViewSection(
           <DashboardHeader name={data.attractionInfo.name} totalReviews={data.attractionInfo.totalReviews} />
         )}
 
-        {/* Se eliminó el SummaryOverviewPanel para ir directo al grano */}
-
-        {/* Se cambió a grid-cols-5 para equilibrar los anchos */}
         <section className="grid grid-cols-1 lg:grid-cols-5 gap-6 pt-4">
           <div className="lg:col-span-3">
-            {/* El resumen ahora ocupa 3/5 (levemente más corto) */}
             <ExecutiveSummary summary={data.executiveSummary} />
           </div>
           <div className="lg:col-span-2">
-            {/* Los KPIs ahora ocupan 2/5 (más anchos para que quepan bien) */}
             <SentimentKPIs
               positive={data.attractionInfo.sentimentRatio.positive ?? 0}
               negative={data.attractionInfo.sentimentRatio.negative ?? 0}
@@ -297,7 +319,6 @@ function renderViewSection(
           <TXDimensionsChart 
             dimensions={data.txDimensions} 
             baseName={data.attractionInfo.name}
-            // Los siguientes props solo se activan en la pestaña "detail"
             {...(variant === "detail" ? {
               compareDimensions: compareAttractionId !== "none" ? compareData.txDimensions : undefined,
               compareName: compareAttractionId !== "none" ? compareData.attractionInfo.name : undefined,
@@ -346,9 +367,11 @@ function renderViewSection(
               {renderNeutralHero(
                 "Análisis País",
                 "Métricas consolidadas de Chile",
-                nationalData.attractionInfo.totalReviews
+                nationalData.attractionInfo.totalReviews,
+                nationalData.summaryOverview.totalAttractions,
+                nationalData.summaryOverview.totalRubros
               )}
-              
+
               <SummaryOverviewPanel
                 title="Resumen General País"
                 overview={nationalData.summaryOverview}
@@ -396,19 +419,29 @@ function renderViewSection(
                 </div>
               ) : (
                 <div className="space-y-6 animate-in fade-in-50 duration-500">
-                  {/* Se cambió a grid-cols-5 para equilibrar los anchos */}
                   <section className="grid grid-cols-1 lg:grid-cols-5 gap-6 pt-4">
                     <div className="lg:col-span-3">
-                      {/* El resumen ahora ocupa 3/5 (levemente más corto) */}
                       <ExecutiveSummary summary={rubroData.executiveSummary} />
                     </div>
                     <div className="lg:col-span-2">
-                      {/* Los KPIs ahora ocupan 2/5 (más anchos para que quepan bien) */}
                       <SentimentKPIs
                         positive={rubroData.attractionInfo.sentimentRatio.positive ?? 0}
                         negative={rubroData.attractionInfo.sentimentRatio.negative ?? 0}
                         neutral={rubroData.attractionInfo.sentimentRatio.neutral ?? 0}
                       />
+                    </div>
+                  </section>
+
+                  <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2">
+                      {rubroData.macroCategories && rubroData.macroCategories.length > 0 && (
+                        <MacroCategoriesChart data={rubroData.macroCategories} />
+                      )}
+                    </div>
+                    <div className="lg:col-span-1">
+                      {rubroData.summaryOverview?.topAttractions && (
+                        <TopAttractionsList attractions={rubroData.summaryOverview.topAttractions} />
+                      )}
                     </div>
                   </section>
 
