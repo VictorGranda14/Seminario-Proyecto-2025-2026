@@ -67,7 +67,7 @@ def build_sentiment_ratio(df: pd.DataFrame) -> dict:
 
 def build_tx_dimensions(df: pd.DataFrame) -> list[dict]:
     comentarios_unicos = df.drop_duplicates(subset=['id_comentario']).copy()
-    todas_las_dimensiones = []
+    dimensiones_stats = {}
     
     for _, row in comentarios_unicos.iterrows():
         dim_text = str(row.get("dimension_tx", ""))
@@ -77,29 +77,45 @@ def build_tx_dimensions(df: pd.DataFrame) -> list[dict]:
             continue
             
         dims = [d.strip() for d in dim_text.split(',') if d.strip()]
-        todas_las_dimensiones.extend(dims)
-
-    if not todas_las_dimensiones:
-        return []
-
-    counts = pd.Series(todas_las_dimensiones).value_counts()
-    counts = counts[counts.index.str.lower() != "sin clasificar"]
-    counts = counts[counts.index != ""]
-    
-    if counts.empty:
-        return []
         
-    max_count = counts.max()
+        # Extraemos la polaridad general del comentario
+        polaridad = normalize_sentiment(row.get("polaridad_general_comentario", ""))
+        
+        for dim in dims:
+            if dim.lower() in ["sin clasificar", ""]:
+                continue
+                
+            if dim not in dimensiones_stats:
+                dimensiones_stats[dim] = {"total": 0, "positive": 0, "negative": 0}
+                
+            # Sumamos al total general
+            dimensiones_stats[dim]["total"] += 1
+            
+            # Repartición binaria: o es positivo, o es fricción/neutro
+            if polaridad == "positive":
+                dimensiones_stats[dim]["positive"] += 1
+            elif polaridad in ["negative", "neutral"]:
+                dimensiones_stats[dim]["negative"] += 1
 
+    if not dimensiones_stats:
+        return []
+
+    # Ordenamos de mayor a menor según el total de apariciones
     return [
-        {"dimension": dimension, "score": round((count / max_count) * 100)}
-        for dimension, count in counts.items()
+        {
+            "dimension": dim,
+            "total": stats["total"],
+            "positive": stats["positive"],
+            "negative": stats["negative"]
+        }
+        for dim, stats in sorted(dimensiones_stats.items(), key=lambda item: item[1]["total"], reverse=True)
     ]
 
 
 def build_dimension_totals(df: pd.DataFrame) -> list[dict]:
     comentarios_unicos = df.drop_duplicates(subset=['id_comentario']).copy()
-    todas_las_dimensiones = []
+    dimensiones_stats = {}
+    total_general = 0
     
     for _, row in comentarios_unicos.iterrows():
         dim_text = str(row.get("dimension_tx", ""))
@@ -109,24 +125,38 @@ def build_dimension_totals(df: pd.DataFrame) -> list[dict]:
             continue
             
         dims = [d.strip() for d in dim_text.split(',') if d.strip()]
-        todas_las_dimensiones.extend(dims)
+        polaridad = normalize_sentiment(row.get("polaridad_general_comentario", ""))
+        
+        for dim in dims:
+            if dim.lower() in ["sin clasificar", ""]:
+                continue
+                
+            if dim not in dimensiones_stats:
+                dimensiones_stats[dim] = {"count": 0, "positive": 0, "negative": 0}
+                
+            dimensiones_stats[dim]["count"] += 1
+            total_general += 1
+            
+            # Repartición binaria para las barras globales
+            if polaridad == "positive":
+                dimensiones_stats[dim]["positive"] += 1
+            elif polaridad in ["negative", "neutral"]:
+                dimensiones_stats[dim]["negative"] += 1
 
-    if not todas_las_dimensiones:
+    if not dimensiones_stats:
         return []
-
-    counts = pd.Series(todas_las_dimensiones).value_counts()
-    counts = counts[counts.index.str.lower() != "sin clasificar"]
-    counts = counts[counts.index != ""]
-    
-    total = max(int(counts.sum()), 1)
+        
+    total_general = max(total_general, 1)
     
     return [
         {
-            "dimension": dimension,
-            "count": int(count),
-            "percentage": round((count / total) * 100, 2),
+            "dimension": dim,
+            "count": stats["count"],
+            "percentage": round((stats["count"] / total_general) * 100, 2),
+            "positive": stats["positive"],
+            "negative": stats["negative"]
         }
-        for dimension, count in counts.items()
+        for dim, stats in sorted(dimensiones_stats.items(), key=lambda item: item[1]["count"], reverse=True)
     ]
 
 
@@ -193,13 +223,11 @@ def build_view_payload(df: pd.DataFrame, *, tipo_vista: str, identificador_vista
     
 
 def build_aspect_analysis(df: pd.DataFrame, tipo_vista: str) -> dict:
-    # Lógica arquitectónica: Global usa Categorías Oficiales. Rubros y Atracciones usan Aspectos Consolidados.
     if tipo_vista == "pais":
         columna_agrupacion = "categoria_oficial"
     else:
         columna_agrupacion = "aspecto_consolidado"
 
-    # Fallback de seguridad por si la base de datos no tiene la columna aún
     if columna_agrupacion not in df.columns:
         columna_agrupacion = "aspecto_detectado"
 
@@ -224,14 +252,13 @@ def build_aspect_analysis(df: pd.DataFrame, tipo_vista: str) -> dict:
             opiniones_pos_raw = group.loc[es_positivo, "opinion_detectada"].dropna().astype(str).tolist()
             opiniones_pos_limpias = []
             
-            # Limpieza y tokenización profunda de adjetivos
             for op in opiniones_pos_raw:
                 for palabra in op.split(','):
                     palabra_limpia = palabra.strip().lower()
                     if palabra_limpia and palabra_limpia != 'nan':
                         opiniones_pos_limpias.append(palabra_limpia)
 
-            top_opinions_pos = [op for op, _ in Counter(opiniones_pos_limpias).most_common(3)]
+            top_opinions_pos = [op for op, _ in Counter(opiniones_pos_limpias).most_common(5)]
             
             entry_pos = {
                 "aspect": aspect_name.title() if tipo_vista != "pais" else aspect_name,
@@ -248,14 +275,13 @@ def build_aspect_analysis(df: pd.DataFrame, tipo_vista: str) -> dict:
             opiniones_neg_raw = group.loc[es_negativo, "opinion_detectada"].dropna().astype(str).tolist()
             opiniones_neg_limpias = []
             
-            # Limpieza y tokenización profunda de adjetivos
             for op in opiniones_neg_raw:
                 for palabra in op.split(','):
                     palabra_limpia = palabra.strip().lower()
                     if palabra_limpia and palabra_limpia != 'nan':
                         opiniones_neg_limpias.append(palabra_limpia)
 
-            top_opinions_neg = [op for op, _ in Counter(opiniones_neg_limpias).most_common(3)]
+            top_opinions_neg = [op for op, _ in Counter(opiniones_neg_limpias).most_common(5)]
             
             entry_neg = {
                 "aspect": aspect_name.title() if tipo_vista != "pais" else aspect_name,
@@ -306,6 +332,27 @@ def build_macro_categories(df: pd.DataFrame) -> list[dict]:
 
     return sorted(resultados, key=lambda x: x["freq"], reverse=True)
 
+def get_existing_summary(db: DBManager, identificador_vista: str) -> str | None:
+    """Busca el JSON existente en la BD y rescata el resumen si ya fue generado por la IA."""
+    try:
+        query = "SELECT json_completo FROM metricas_consolidadas WHERE identificador_vista = ?"
+        cursor = db.conn.cursor()
+        cursor.execute(query, (identificador_vista,))
+        row = cursor.fetchone()
+        
+        if row and row[0]:
+            datos = json.loads(row[0])
+            if isinstance(datos, str):
+                datos = json.loads(datos)
+            
+            resumen_actual = datos.get("executiveSummary", "")
+            
+            if resumen_actual and "Resumen ejecutivo en construcción" not in resumen_actual:
+                return resumen_actual
+    except Exception as e:
+        pass
+        
+    return None
 
 def aggregate_view(
     db: DBManager,
@@ -321,6 +368,12 @@ def aggregate_view(
         identificador_vista=identificador_vista,
         nombre_vista=nombre_vista,
     )
+    
+    resumen_guardado = get_existing_summary(db, identificador_vista)
+    
+    if resumen_guardado:
+        payload["executiveSummary"] = resumen_guardado
+
     db.upsert_metricas_consolidadas(identificador_vista, nombre_vista, tipo_vista, payload)
     return payload
 
@@ -412,14 +465,14 @@ def main() -> None:
     
     if args.attraction:
         payload = aggregate_attraction(args.database, args.attraction)
-        print(f"\n✓ Éxito: Se consolidó la atracción individual: '{args.attraction}'.")
+        print(f"\nÉxito: Se consolidó la atracción individual: '{args.attraction}'.")
     else:
         payloads = aggregate_all_views(args.database)
         print("\n==================================================")
         print("          EJECUCIÓN FINALIZADA CON ÉXITO          ")
         print("==================================================")
-        print(f"✓ Total de vistas calculadas e inyectadas: {len(payloads)}")
-        print(f"✓ Destino: Tabla 'metricas_consolidadas' en '{args.database}'")
+        print(f"Total de vistas calculadas e inyectadas: {len(payloads)}")
+        print(f"Destino: Tabla 'metricas_consolidadas' en '{args.database}'")
         print("==================================================")
 
 

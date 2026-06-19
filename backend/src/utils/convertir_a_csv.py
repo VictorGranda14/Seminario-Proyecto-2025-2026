@@ -12,7 +12,6 @@ def convertir():
         return
         
     print(f"Convirtiendo {len(df)} filas a CSV...")
-    # Usamos punto y coma (;) como separador para que las comas del texto en inglés no rompan las columnas
     df.to_csv(ruta_csv, index=False, sep=';', encoding='utf-8-sig')
     
     print(f"¡Conversión exitosa! Archivo guardado en {ruta_csv}")

@@ -23,8 +23,6 @@ def parse_aspects_with_sentiment(aspect_string):
     """
     if not isinstance(aspect_string, str): return []
     
-    # Nueva Regex para capturar: Aspecto ( Opinion | Sentimiento )
-    # Estructura: Texto fuera parentesis ( Texto dentro | Texto dentro )
     pattern = r"([^,]+)\(([^|]+)\|([^)]+)\)"
     matches = re.findall(pattern, aspect_string)
     
@@ -58,19 +56,18 @@ def main():
     if not os.path.exists(OUTPUT_FOLDER):
         os.makedirs(OUTPUT_FOLDER)
 
-    print(f"📊 Cargando datos desde {INPUT_FILE}...")
+    print(f"Cargando datos desde {INPUT_FILE}...")
     try:
         df = pd.read_excel(INPUT_FILE)
     except FileNotFoundError:
         print(f"❌ Error: No se encontró el archivo.")
         return
 
-    print("🔄 Procesando con precisión por aspecto...")
+    print("Procesando con precisión por aspecto...")
 
     # 1. Preprocesamiento
     df['lista_dimensiones'] = df['Dimensiones_TX'].fillna('').apply(lambda x: x.split(', ') if x else [])
     
-    # AQUI LA MAGIA: Usamos la nueva función de parseo
     df['lista_aspectos'] = df['Aspectos_Minados'].apply(parse_aspects_with_sentiment)
     
     # Sentimiento Global (Solo para separar dimensiones generales)
@@ -93,7 +90,6 @@ def main():
     # ==========================================
     # 2. ANÁLISIS DE ASPECTOS (Usando Sentimiento ESPECÍFICO)
     # ==========================================
-    # Explotamos para tener una fila por aspecto
     df_aspectos = df.explode('lista_aspectos').dropna(subset=['lista_aspectos'])
     
     # Extraemos los datos individuales
@@ -118,7 +114,7 @@ def main():
     # ==========================================
     # GUARDAR REPORTE
     # ==========================================
-    print(f"💾 Guardando reporte preciso en {OUTPUT_EXCEL}...")
+    print(f"Guardando reporte preciso en {OUTPUT_EXCEL}...")
     
     with pd.ExcelWriter(OUTPUT_EXCEL, engine='openpyxl') as writer:
         dims_maestra.to_excel(writer, sheet_name='1. Panorama Dimensiones', index=False)
@@ -136,7 +132,7 @@ def main():
             sheet.column_dimensions['B'].width = 15
             sheet.column_dimensions['C'].width = 50
 
-    print("¡Tablero de Alta Precisión generado! ✅")
+    print("¡Tablero generado!")
 
 if __name__ == "__main__":
     main()

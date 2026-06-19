@@ -33,10 +33,9 @@ def filtrar_atracciones_minimas(ruta_entrada, ruta_salida, minimo_comentarios=10
     print(f"\n3. Archivo filtrado y final guardado en: {ruta_salida}")
 
 if __name__ == "__main__":
-    # Ajusta con tu ruta del archivo definitivo fusionado
-    archivo_entrada = r"C:\Users\ramiro\Seminario-Proyecto-2025-2026\backend\data\outputs\output_llm.csv"
-    
-    # Puedes sobreescribirlo o crear uno nuevo con "_FILTRADO"
-    archivo_salida = r"C:\Users\ramiro\Seminario-Proyecto-2025-2026\backend\data\outputs\output_llm_filtrado.csv"
+
+    # Ajusta estas rutas según tu estructura de carpetas
+    archivo_entrada = r"\Seminario-Proyecto-2025-2026\backend\data\outputs\output_llm.csv"
+    archivo_salida = r"\Seminario-Proyecto-2025-2026\backend\data\outputs\output_llm_filtrado.csv"
     
     filtrar_atracciones_minimas(archivo_entrada, archivo_salida)

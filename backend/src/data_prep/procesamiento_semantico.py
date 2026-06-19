@@ -8,7 +8,7 @@ from sentence_transformers import SentenceTransformer
 from sklearn.cluster import MiniBatchKMeans
 from collections import Counter
 
-# Configuración optimizada
+# Configuración del motor local y categorías oficiales
 OLLAMA_API_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "qwen2.5:3b"
 
@@ -130,7 +130,6 @@ def procesar_base_de_datos(ruta_db: str, attraction: str = None):
     print(f"3. Clustering Semántico ({len(agrupado)} aspectos) usando MiniBatchKMeans...")
     embeddings = modelo_embedding.encode(agrupado['aspecto_detectado'].tolist())
     
-    # TRUCO MATEMÁTICO: Normalizar los vectores
     embeddings_norm = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
     
     # Cálculo dinámico de 'K'
@@ -140,7 +139,7 @@ def procesar_base_de_datos(ruta_db: str, attraction: str = None):
     cluster_model = MiniBatchKMeans(n_clusters=n_clusters, batch_size=1024, random_state=42, n_init="auto")
     agrupado['Cluster_ID'] = cluster_model.fit_predict(embeddings_norm)
 
-    # RECONSTRUCCIÓN DEL BUCLE (Recuperado)
+    # RECONSTRUCCIÓN DEL BUCLE
     aspectos_consolidados = {}
     for cluster_id, grupo in agrupado.groupby('Cluster_ID'):
         etiqueta_dominante = grupo.loc[grupo['frecuencia'].idxmax(), 'aspecto_detectado']
@@ -160,7 +159,7 @@ def procesar_base_de_datos(ruta_db: str, attraction: str = None):
             }
 
     # ==========================================
-    # FASE 2: LLM + SISTEMA DE CACHÉ
+    # FASE 2: LLM
     # ==========================================
     unicos_consolidados = {datos['consolidado']: datos['contexto'] for datos in aspectos_consolidados.values()}
     
@@ -192,7 +191,7 @@ def procesar_base_de_datos(ruta_db: str, attraction: str = None):
     print(f"-> Se llamaron a Ollama {procesados_nuevos} veces. ({total_a_procesar - procesados_nuevos} ahorrados por caché).")
 
     # ==========================================
-    # FASE 3: EXPORTACIÓN DE RESCATE (CSV)
+    # FASE 3: EXPORTACIÓN DE CSV
     # ==========================================
     print("5. Exportando resultados a CSV...")
     
@@ -210,15 +209,18 @@ def procesar_base_de_datos(ruta_db: str, attraction: str = None):
     df_mapeo = pd.DataFrame(filas_mapeo)
     
     # Guardamos directo en tu Google Drive
+    # Asegúrate de montar tu Google Drive en Colab y ajustar la ruta si es necesario
     ruta_rescate = "/content/drive/MyDrive/proyecto_tesis/diccionario_mapeo_llm.csv"
     df_mapeo.to_csv(ruta_rescate, index=False, encoding='utf-8-sig')
     
-    print(f"¡Procesamiento semántico finalizado en tiempo récord!")
+    print(f"Procesamiento semántico finalizado")
     print(f"-> Descarga el archivo '{ruta_rescate}' a tu PC.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Procesamiento Semántico de Aspectos Turísticos")
-    parser.add_argument("--database", default=r"C:\Users\ramiro\Seminario-Proyecto-2025-2026\backend\data\turismo.sqlite", help="Ruta a la base de datos SQLite")
+
+    # Asegúrate de ajustar la ruta por defecto a tu base de datos local antes de ejecutar
+    parser.add_argument("--database", default=r"C:---\Seminario-Proyecto-2025-2026\backend\data\turismo.sqlite", help="Ruta a la base de datos SQLite")
     parser.add_argument("--attraction", default=None, help="Nombre de la atracción para procesar de forma aislada")
     
     args = parser.parse_args()

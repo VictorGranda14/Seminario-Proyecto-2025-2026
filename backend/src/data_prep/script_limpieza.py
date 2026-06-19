@@ -29,12 +29,11 @@ def remove_owner_responses(text):
     for marker in OWNER_MARKERS:
         index = text_lower.find(marker)
         if index != -1:
-            # Corta el texto justo antes de que empiece la respuesta del dueño
             return text[:index].strip()
     return text.strip()
 
 def run_cleaning_pipeline():
-    print("🚀 Iniciando Pipeline de Limpieza Unificado...")
+    print("Iniciando Pipeline de Limpieza")
     
     # 1. Carga de datos
     print(f"Cargando datos desde {INPUT_FILE}...")

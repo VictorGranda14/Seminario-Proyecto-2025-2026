@@ -7,20 +7,16 @@ def poblar_sqlite_desde_csv(ruta_csv: str, ruta_db: str):
     print(f"1. Leyendo dataset maestro: {ruta_csv}")
     df = pd.read_csv(ruta_csv)
     
-    # 2. Conectar e Inicializar DB
     conexion = sqlite3.connect(ruta_db)
     initialize_database(conexion)
     cursor = conexion.cursor()
     
-    # IMPORTANTE: Vaciamos la tabla de análisis crudo antes de inyectar 
-    # para evitar duplicar millones de filas si corres el script 2 veces.
     print("2. Purgando tabla 'analisis_crudo' antigua para inyección limpia...")
     cursor.execute("DELETE FROM analisis_crudo")
     
     filas_a_insertar = []
     
     print("3. Adaptando datos y desempaquetando aspectos...")
-    # 3. Iterar y Adaptar los datos
     for _, row in df.iterrows():
         
         # A) Leer el JSON con comillas simples de forma segura, evadiendo los NaN
@@ -45,7 +41,7 @@ def poblar_sqlite_desde_csv(ruta_csv: str, ruta_db: str):
         
         # D) Inyectar datos clave
         rubro = row.get('rubro', 'Turismo General')
-        modelo = 'qwen2.5-3b' # Modificado para reflejar tu motor local real
+        modelo = 'qwen2.5-3b'
         
         for aspecto_obj in aspectos:
             filas_a_insertar.append((
@@ -76,8 +72,9 @@ def poblar_sqlite_desde_csv(ruta_csv: str, ruta_db: str):
     print("¡Base de datos poblada exitosamente! Lista para conectar al backend de Next.js.")
 
 if __name__ == "__main__":
-    # Ajusta con tu ruta del archivo definitivo fusionado
-    archivo_maestro = r"C:\Users\ramiro\Seminario-Proyecto-2025-2026\backend\data\outputs\output_llm.csv"
-    base_de_datos = r"C:\Users\ramiro\Seminario-Proyecto-2025-2026\backend\data\turismo.sqlite"
+
+    # ASEGURAR QUE LAS RUTAS ESTÉN CORRECTAS ANTES DE EJECUTAR
+    archivo_maestro = r"---\Seminario-Proyecto-2025-2026\backend\data\outputs\output_llm.csv"
+    base_de_datos = r"---\Seminario-Proyecto-2025-2026\backend\data\turismo.sqlite"
     
     poblar_sqlite_desde_csv(archivo_maestro, base_de_datos)

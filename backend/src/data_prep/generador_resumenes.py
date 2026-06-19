@@ -5,8 +5,7 @@ import time
 
 # Configuración del motor local
 OLLAMA_API_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "qwen2.5:3b" # Cambiar a "qwen2.5:7b" si tienes la versión de 7B activa en Ollama
-
+MODEL_NAME = "qwen2.5:3b"
 def generar_resumen_local(nombre, tipo, total_reviews, polaridad_positiva, categorias_top, top_fortalezas, top_alertas):
     contexto_tipo = f"el rubro sectorial '{nombre}'" if tipo == "rubro" else f"la atracción turística '{nombre}'"
         
@@ -48,7 +47,7 @@ def formatear_aspectos(lista_aspectos):
         return "Ninguna"
     
     textos = []
-    for item in lista_aspectos[:3]: # Tomamos el Top 3
+    for item in lista_aspectos[:3]:
         aspecto = item.get("aspect", "")
         keywords = item.get("keywords", [])
         
@@ -133,7 +132,7 @@ def procesar_resumenes_json(ruta_db: str):
         resumen_texto = generar_resumen_local(nombre, tipo, total_rev, pct_positivo, categorias_top, fortalezas, alertas)
         
         tiempo_transcurrido = time.time() - inicio_tiempo
-        print(f"✓ Generado en {tiempo_transcurrido:.2f} segundos.")
+        print(f"Generado en {tiempo_transcurrido:.2f} segundos.")
 
         # Asignar e inyectar el texto limpio en la estructura JSON
         datos_vista["executiveSummary"] = resumen_texto
@@ -151,5 +150,7 @@ def procesar_resumenes_json(ruta_db: str):
     print("Pipeline de generación finalizado con éxito.")
 
 if __name__ == "__main__":
-    ruta_base_datos = "C:\\Users\\ramiro\\Seminario-Proyecto-2025-2026\\backend\\data\\turismo.sqlite"
+
+    # ASEGURAR QUE LA RUTA DE LA BASE DE DATOS ESTÉ CORRECTA ANTES DE EJECUTAR
+    ruta_base_datos = "---\\Seminario-Proyecto-2025-2026\\backend\\data\\turismo.sqlite"
     procesar_resumenes_json(ruta_base_datos)
